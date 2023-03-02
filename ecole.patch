@@ -1,0 +1,1035 @@
+From ca8dce00a383f2919353823e4fb11349875b34a4 Mon Sep 17 00:00:00 2001
+From: ndrwnaguib <24280372+ndrwnaguib@users.noreply.github.com>
+Date: Wed, 15 Feb 2023 18:14:09 -0800
+Subject: [PATCH 1/3] adding a loader for the vehicle routing problem
+
+---
+ libecole/CMakeLists.txt                       |   1 +
+ .../instance/capacitated-vehicle-routing.hpp  |  38 ++
+ .../instance/capacitated-vehicle-routing.cpp  | 375 ++++++++++++++++++
+ python/ecole/src/ecole/core/instance.cpp      |  28 ++
+ 4 files changed, 442 insertions(+)
+ create mode 100644 libecole/include/ecole/instance/capacitated-vehicle-routing.hpp
+ create mode 100644 libecole/src/instance/capacitated-vehicle-routing.cpp
+
+diff --git a/libecole/CMakeLists.txt b/libecole/CMakeLists.txt
+index 2c74394..1eab347 100644
+--- a/libecole/CMakeLists.txt
++++ b/libecole/CMakeLists.txt
+@@ -21,6 +21,7 @@ add_library(
+ 	src/instance/independent-set.cpp
+ 	src/instance/combinatorial-auction.cpp
+ 	src/instance/capacitated-facility-location.cpp
++	src/instance/capacitated-vehicle-routing.cpp
+ 
+ 	src/reward/is-done.cpp
+ 	src/reward/lp-iterations.cpp
+diff --git a/libecole/include/ecole/instance/capacitated-vehicle-routing.hpp b/libecole/include/ecole/instance/capacitated-vehicle-routing.hpp
+new file mode 100644
+index 0000000..9c0cf04
+--- /dev/null
++++ b/libecole/include/ecole/instance/capacitated-vehicle-routing.hpp
+@@ -0,0 +1,38 @@
++#pragma once
++
++#include <cstddef>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "ecole/export.hpp"
++#include "ecole/instance/abstract.hpp"
++#include "ecole/random.hpp"
++
++namespace ecole::instance {
++
++class ECOLE_EXPORT CapacitatedVehicleRoutingLoader : public InstanceGenerator {
++public:
++	struct ECOLE_EXPORT Parameters {
++		std::string filename;    // NOLINT(readability-magic-numbers)
++		std::size_t n_vehicles;  // NOLINT(readability-magic-numbers)
++	};
++
++	ECOLE_EXPORT static scip::Model generate_instance(Parameters parameters, RandomGenerator& rng);
++
++	ECOLE_EXPORT CapacitatedVehicleRoutingLoader(Parameters parameters, RandomGenerator rng);
++	ECOLE_EXPORT CapacitatedVehicleRoutingLoader(Parameters parameters);
++	ECOLE_EXPORT CapacitatedVehicleRoutingLoader();
++
++	ECOLE_EXPORT scip::Model next() override;
++	ECOLE_EXPORT void seed(Seed seed) override;
++	[[nodiscard]] ECOLE_EXPORT bool done() const override { return false; }
++
++	[[nodiscard]] ECOLE_EXPORT Parameters const& get_parameters() const noexcept { return parameters; }
++
++private:
++	RandomGenerator rng;
++	Parameters parameters;
++};
++
++}  // namespace ecole::instance
+diff --git a/libecole/src/instance/capacitated-vehicle-routing.cpp b/libecole/src/instance/capacitated-vehicle-routing.cpp
+new file mode 100644
+index 0000000..fec0b07
+--- /dev/null
++++ b/libecole/src/instance/capacitated-vehicle-routing.cpp
+@@ -0,0 +1,375 @@
++#include <array>
++#include <cstddef>
++#include <fstream>
++#include <iostream>
++#include <memory>
++#include <scip/type_var.h>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "ecole/instance/capacitated-vehicle-routing.hpp"
++#include "ecole/scip/cons.hpp"
++#include "ecole/scip/model.hpp"
++#include "ecole/scip/utils.hpp"
++#include "ecole/scip/var.hpp"
++#include <fmt/format.h>
++#include <range/v3/view/enumerate.hpp>
++#include <xtensor/xadapt.hpp>
++#include <xtensor/xio.hpp>
++#include <xtensor/xmath.hpp>
++#include <xtensor/xrandom.hpp>
++#include <xtensor/xtensor.hpp>
++#include <xtensor/xview.hpp>
++
++namespace views = ranges::views;
++
++namespace ecole::instance {
++
++/**************************************************
++ *  CapacitatedVehicleRoutingLoader methods  *
++ **************************************************/
++
++CapacitatedVehicleRoutingLoader::CapacitatedVehicleRoutingLoader(
++	CapacitatedVehicleRoutingLoader::Parameters parameters_,
++	RandomGenerator rng_) :
++	rng{rng_}, parameters{std::move(parameters_)} {}
++CapacitatedVehicleRoutingLoader::CapacitatedVehicleRoutingLoader(
++	CapacitatedVehicleRoutingLoader::Parameters parameters_) :
++	CapacitatedVehicleRoutingLoader{parameters_, ecole::spawn_random_generator()} {}
++CapacitatedVehicleRoutingLoader::CapacitatedVehicleRoutingLoader() : CapacitatedVehicleRoutingLoader(Parameters{}) {}
++
++scip::Model CapacitatedVehicleRoutingLoader::next() {
++	return generate_instance(parameters, rng);
++}
++
++void CapacitatedVehicleRoutingLoader::seed(Seed seed) {
++	rng.seed(seed);
++}
++
++/*************************************************************
++ *  CapacitatedVehicleRoutingLoader::generate_instance  *
++ *************************************************************/
++
++namespace {
++
++using value_type = SCIP_Real;
++using xvector = xt::xtensor<value_type, 1>;
++using xmatrix = xt::xtensor<value_type, 2>;
++
++auto read_problem(
++	std::string& filename,                    /**< filename */
++	std::size_t& n_customers,                 /**< number of nodes in instance */
++	int& capacity,                            /**< capacity in instance */
++	std::vector<int>& demand,                 /**< array of demands of instance */
++	std::vector<std::vector<SCIP_Real>>& dist /**< distances between nodes*/
++) {
++	static const std::string DIMENSION = "DIMENSION";
++	static const std::string DEMAND_SECTION = "DEMAND_SECTION";
++	static const std::string DEPOT_SECTION = "DEPOT_SECTION";
++	static const std::string EDGE_WEIGHT_TYPE = "EDGE_WEIGHT_TYPE";
++	static const std::string EUC_2D = "EUC_2D";
++	static const std::string EXPLICIT = "EXPLICIT";
++	static const std::string LOWER_DIAG_ROW = "LOWER_DIAG_ROW";
++	static const std::string EDGE_WEIGHT_FORMAT = "EDGE_WEIGHT_FORMAT";
++	static const std::string EDGE_WEIGHT_SECTION = "EDGE_WEIGHT_SECTION";
++	static const std::string NODE_COORD_SECTION = "NODE_COORD_SECTION";
++	static const std::string CAPACITY = "CAPACITY";
++
++	std::ifstream file(filename);
++
++	if (!file) {
++		std::cerr << "Cannot open file " << filename << std::endl;
++		return 1;
++	}
++
++	std::string edge_weight_type = "";
++	std::string edge_weight_format = "";
++	std::vector<int> x;
++	std::vector<int> y;
++
++	while (file) {
++		//--------------------
++		// Read keyword.
++		//--------------------
++		std::string key;
++		std::string dummy;
++		file >> key;
++
++		if (key == DIMENSION) {
++			file >> dummy;
++			file >> n_customers;
++			demand.resize(n_customers, 0); /*lint !e732 !e747*/
++			dist.resize(n_customers);      /*lint !e732 !e747*/
++			for (int i = 0; i < n_customers; ++i)
++				dist[i].resize(n_customers, 0); /*lint !e732 !e747*/
++		}
++
++		if (key == CAPACITY) {
++			file >> dummy;
++			file >> capacity;
++		} else if (key == EDGE_WEIGHT_TYPE) {
++			file >> dummy;
++			file >> edge_weight_type;
++			if (edge_weight_type != EUC_2D && edge_weight_type != EXPLICIT) {
++				std::cerr << "Wrong " << EDGE_WEIGHT_TYPE << " " << edge_weight_type << std::endl;
++				return 1;
++			}
++			if (edge_weight_type == EUC_2D) {
++				x.resize(n_customers, 0); /*lint !e732 !e747*/
++				y.resize(n_customers, 0); /*lint !e732 !e747*/
++			}
++		} else if (key == EDGE_WEIGHT_FORMAT) {
++			file >> dummy;
++			file >> edge_weight_format;
++		} else if (key == EDGE_WEIGHT_FORMAT + ":") {
++			file >> edge_weight_format;
++		} else if (key == EDGE_WEIGHT_SECTION) {
++			if (edge_weight_type != EXPLICIT || edge_weight_format != LOWER_DIAG_ROW) {
++				std::cerr << "Error. Unsupported edge length type." << std::endl;
++				return 1;
++			}
++			for (int i = 0; i < n_customers; ++i) {
++				for (int j = 0; j < n_customers; ++j) {
++					int l;
++					file >> l;
++					dist[i][j] = l; /*lint !e732 !e747*/
++				}
++			}
++		} else if (key == NODE_COORD_SECTION) {
++			if (edge_weight_type != EUC_2D) {
++				std::cerr << "Error. Data file contains " << EDGE_WEIGHT_TYPE << " " << edge_weight_type << " and "
++									<< NODE_COORD_SECTION << std::endl;
++				return 1;
++			}
++			for (int i = 0; i < n_customers; ++i) {
++				int j, xi, yi;
++				file >> j;
++				file >> xi;
++				file >> yi;
++				if (j != i + 1) {
++					std::cerr << "Error reading " << NODE_COORD_SECTION << std::endl;
++					return 1;
++				}
++				x[i] = xi; /*lint !e732 !e747*/
++				y[i] = yi; /*lint !e732 !e747*/
++			}
++			for (int i = 0; i < n_customers; ++i) {
++				for (int j = 0; j < n_customers; ++j) {
++					int dx = x[i] - x[j];                            /*lint !e732 !e747 !e864*/
++					int dy = y[i] - y[j];                            /*lint !e732 !e747 !e864*/
++					dist[i][j] = (SCIP_Real)sqrt(dx * dx + dy * dy); /*lint !e732 !e747 !e790*/
++				}
++			}
++		} else if (key == DEMAND_SECTION) {
++			for (int i = 0; i < n_customers; ++i) {
++				int j, d;
++				file >> j;
++				file >> d;
++				if (j != i + 1) {
++					std::cerr << "Error reading " << DEMAND_SECTION << std::endl;
++					return 1;
++				}
++				demand[i] = d; /*lint !e732 !e747*/
++			}
++		} else if (key == DEPOT_SECTION) {
++			for (int i = 0; i != -1;) {
++				file >> i;
++				if (i != -1 && i != 1) {
++					std::cerr << "Error: This file specifies other depots than 1." << std::endl;
++					return 1;
++				}
++			}
++		} else {
++			(void)getline(file, dummy);
++		}
++	}
++
++	return 0;
++}
++
++/** Create and add a single binary variable the for the fraction of customer demand served by the vehicle.
++ *
++ * Variables are automatically released (using the unique_ptr provided by scip::create_var_basic) after being captured
++ * by the scip*. Their lifetime should not exceed that of the scip* (although that was already implied when creating
++ * them).
++ */
++auto add_serving_var(SCIP* scip, std::size_t i, std::size_t j, SCIP_Real cost, bool continuous) -> SCIP_VAR* {
++	auto const name = fmt::format("x_{}_{}", i, j);
++	auto unique_var = scip::create_var_basic(
++		scip, name.c_str(), 0.0, 1.0, cost, /*add options for continuous variables */ SCIP_VARTYPE_BINARY);
++	auto* var_ptr = unique_var.get();
++	scip::call(SCIPaddVar, scip, var_ptr);
++	return var_ptr;
++}
++
++/** Create and add all variables for serving the fraction of customer demands from vehicles.
++ *
++ * Variables pointers are returned in a symmetric n_customers matrix .
++ */
++auto add_serving_vars(SCIP* scip, std::vector<std::vector<SCIP_Real>>& transportation_costs, bool continuous) {
++	// symmetric matrix
++	auto const n_customers = transportation_costs.size();
++	auto vars = xt::xtensor<SCIP_VAR*, 2>{{n_customers, n_customers}, nullptr};
++	for (std::size_t i = 0; i < n_customers; ++i) {
++		for (std::size_t j = 0; j < n_customers; ++j) {
++			if (i != j) {
++				auto cost = transportation_costs[i][j];
++				vars(i, j) = add_serving_var(scip, i, j, cost, continuous);
++			}
++		}
++	}
++	return vars;
++}
++
++/** Create and add a single integer variable the representing the assignment of the vehicle.
++ *
++ * Variables are automatically released (using the unique_ptr provided by scip::create_var_basic) after being captured
++ * by the scip*. Their lifetime should not exceed that of the scip* (although that was already implied when creating
++ * them).
++ */
++auto add_accumulated_demand_var(SCIP* scip, std::size_t idx, int capacity) -> SCIP_VAR* {
++	auto const name = fmt::format("u_{}", idx);
++	auto unique_var = scip::create_var_basic(scip, name.c_str(), 0.0, capacity, 0.0, SCIP_VARTYPE_CONTINUOUS);
++	auto* var_ptr = unique_var.get();
++	scip::call(SCIPaddVar, scip, var_ptr);
++	return var_ptr;
++}
++
++auto add_accumulated_demand_vars(SCIP* scip, std::size_t n_customers, int capacity) {
++	auto vars = xt::xtensor<SCIP_VAR*, 1>({n_customers}, nullptr);
++	auto* out_iter = vars.begin();
++	for (std::size_t i = 1; i < n_customers; ++i) {
++		/*pre-incrementing out_iter to start assigning from 1*/
++		*(++out_iter) = add_accumulated_demand_var(scip, i, capacity);
++	}
++	return vars;
++}
++
++/* capacity constraints */
++auto add_capacity_cons(
++	SCIP* scip,
++	xt::xtensor<SCIP_VAR*, 1> const& accumulated_demand_vars,
++	xvector const& demands,
++	int capacity) -> void {
++
++	auto const [n_customers] = accumulated_demand_vars.shape();
++	assert(demands.size() == n_customers);
++
++	for (std::size_t i = 1; i < n_customers; ++i) {
++		auto const name = fmt::format("c_{}", i);
++		auto constexpr coefs = std::array<SCIP_Real, 1>{1.};
++		auto cons = scip::create_cons_basic_linear(
++			scip, name.c_str(), 1, &accumulated_demand_vars[i], coefs.data(), demands[i], capacity);
++		scip::call(SCIPaddCons, scip, cons.get());
++	}
++}
++
++// Miller-Tucker-Zemlin SEC constraints
++auto add_mtz_cons(
++	SCIP* scip,
++	xt::xtensor<SCIP_VAR*, 2> const& serving_vars,
++	xt::xtensor<SCIP_VAR*, 1> const& accumulated_demand_vars,
++	xvector const& demands,
++	int capacity) -> void {
++
++	auto const inf = SCIPinfinity(scip);
++	auto const [n_customers, THROW_AWAY] = serving_vars.shape();
++	assert(accumulated_demand_vars.size() == n_customers);
++
++	for (std::size_t i = 1; i < n_customers; ++i) {
++		for (std::size_t j = 1; j < n_customers; ++j) {
++			if (i != j) {
++				auto const mtz_se_con_name = fmt::format("mtz_se_con_{}_{}", i, j);
++				// u[i] - u[j]
++				auto coefs = std::array<SCIP_Real, 3>{1.0, -1.0, (SCIP_Real)capacity};
++				auto vars =
++					std::array<SCIP_VAR*, 3>{accumulated_demand_vars[i], accumulated_demand_vars[j], serving_vars(i, j)};
++				auto cons = scip::create_cons_basic_linear(
++					scip, mtz_se_con_name.c_str(), vars.size(), vars.data(), coefs.data(), -inf, capacity - demands[j]);
++				scip::call(SCIPaddCons, scip, cons.get());
++			}
++		}
++	}
++}
++
++/* add arc-routing - degree constraints */
++auto add_degree_out_cons(SCIP* scip, xt::xtensor<SCIP_VAR*, 2> const& serving_vars, std::size_t n_vehicles) -> void {
++	auto const [n_customers, THROW_AWAY] = serving_vars.shape();
++	for (std::size_t j = 0; j < n_customers; ++j) {
++		auto const name = fmt::format("deg_con_out_{}", j);
++		auto cons = scip::create_cons_basic_linear(
++			scip,
++			name.c_str(),
++			0,
++			nullptr,
++			nullptr,
++			j > 0 ? 1.0 : n_vehicles,  /* lhs */
++			j > 0 ? 1.0 : n_vehicles); /* rhs */
++		for (std::size_t i = 0; i < n_customers; ++i) {
++			if (i != j) {
++				scip::call(SCIPaddCoefLinear, scip, cons.get(), serving_vars(i, j), 1.0);
++			}
++		}
++		scip::call(SCIPaddCons, scip, cons.get());
++	}
++}
++
++auto add_degree_in_cons(SCIP* scip, xt::xtensor<SCIP_VAR*, 2> const& serving_vars, std::size_t n_vehicles) -> void {
++	auto const [n_customers, THROW_AWAY] = serving_vars.shape();
++	for (std::size_t i = 0; i < n_customers; ++i) {
++		auto const name = fmt::format("deg_con_in_{}", i);
++		auto cons = scip::create_cons_basic_linear(
++			scip,
++			name.c_str(),
++			0,
++			nullptr,
++			nullptr,
++			i > 0 ? 1.0 : n_vehicles,  /* lhs */
++			i > 0 ? 1.0 : n_vehicles); /* rhs */
++
++		for (std::size_t j = 0; j < n_customers; ++j) {
++			if (j != i) {
++				scip::call(SCIPaddCoefLinear, scip, cons.get(), serving_vars(i, j), 1.0);
++			}
++		}
++		scip::call(SCIPaddCons, scip, cons.get());
++	}
++}
++
++}  // namespace
++
++scip::Model CapacitatedVehicleRoutingLoader::generate_instance(
++	CapacitatedVehicleRoutingLoader::Parameters parameters,
++	RandomGenerator& rng /*not used*/) {
++
++	std::size_t n_customers;                   // NOLINT(readability-magic-numbers)
++	int capacity;                              // NOLINT(readability-magic-numbers)
++	bool continuous_assignment = false;        // NOLINT(readability-magic-numbers)
++	std::vector<int> demands_;                 // NOLINT(readability-magic-numbers)
++	std::vector<std::vector<SCIP_Real>> dist;  // NOLINT(readability-magic-numbers)
++
++	if (read_problem(parameters.filename, n_customers, capacity, demands_, dist)) {
++		throw SCIP_READERROR;
++	}
++
++	// // Customer demand
++	auto const demands = static_cast<xvector>(xt::adapt(demands_));
++
++	auto model = scip::Model::prob_basic();
++	model.set_name(fmt::format("CapacitatedVehicleRouting-{}-{}", n_customers, parameters.n_vehicles));
++
++	auto* const scip = model.get_scip_ptr();
++
++	auto const serving_vars = add_serving_vars(scip, dist, continuous_assignment);
++	auto const accumulated_demand_vars = add_accumulated_demand_vars(scip, n_customers, capacity);
++
++	add_capacity_cons(scip, accumulated_demand_vars, demands, capacity);
++	add_mtz_cons(scip, serving_vars, accumulated_demand_vars, demands, capacity);
++	add_degree_out_cons(scip, serving_vars, parameters.n_vehicles);
++	add_degree_in_cons(scip, serving_vars, parameters.n_vehicles);
++
++	return model;
++}
++
++}  // namespace ecole::instance
+diff --git a/python/ecole/src/ecole/core/instance.cpp b/python/ecole/src/ecole/core/instance.cpp
+index 12f239e..614da25 100644
+--- a/python/ecole/src/ecole/core/instance.cpp
++++ b/python/ecole/src/ecole/core/instance.cpp
+@@ -4,6 +4,7 @@
+ #include <pybind11/pybind11.h>
+ 
+ #include "ecole/instance/capacitated-facility-location.hpp"
++#include "ecole/instance/capacitated-vehicle-routing.hpp"
+ #include "ecole/instance/combinatorial-auction.hpp"
+ #include "ecole/instance/files.hpp"
+ #include "ecole/instance/independent-set.hpp"
+@@ -337,6 +338,33 @@ void bind_submodule(py::module const& m) {
+ 	def_attributes(capacitated_facility_location_gen, capacitated_facility_location_params);
+ 	def_iterator(capacitated_facility_location_gen);
+ 	capacitated_facility_location_gen.def("seed", &CapacitatedFacilityLocationGenerator::seed, py::arg(" seed"));
++
++	// The Capacitated Vehicle Routing parameters used in constructor, generate_instance, and attributes
++	auto constexpr capacitated_vehicle_routing_params = std::tuple{
++		Member{"filename", &CapacitatedVehicleRoutingLoader::Parameters::filename},
++		Member{"n_vehicles", &CapacitatedVehicleRoutingLoader::Parameters::n_vehicles},
++	};
++	// Bind CapacitatedVehicleRoutingLoader and remove intermediate Parameter class
++	auto capacitated_vehicle_routing_load =
++		py::class_<CapacitatedVehicleRoutingLoader>{m, "CapacitatedVehicleRoutingLoader"};
++	def_generate_instance(capacitated_vehicle_routing_load, capacitated_vehicle_routing_params, R"(
++		Load a capacitated vehicle routing MILP problem instance.
++
++		The capacitated vehicle routing problems assigns a number of vehicles to
++		serve a number of customers. Not all vehicles need to be operate. 
++
++		Parameters
++		----------
++    filename:
++      The VRP file.
++		n_vehicles:
++			The number of vehicles.
++	)");
++	def_init(capacitated_vehicle_routing_load, capacitated_vehicle_routing_params);
++	def_attributes(capacitated_vehicle_routing_load, capacitated_vehicle_routing_params);
++	def_iterator(capacitated_vehicle_routing_load);
++	capacitated_vehicle_routing_load.def("seed", &CapacitatedVehicleRoutingLoader::seed, py::arg(" seed"));
++
+ }
+ 
+ /******************************************
+-- 
+2.39.0
+
+
+From 353a45091ff8c9f324824fb5007cbdb11ba6e091 Mon Sep 17 00:00:00 2001
+From: ndrwnaguib <24280372+ndrwnaguib@users.noreply.github.com>
+Date: Wed, 15 Feb 2023 18:20:56 -0800
+Subject: [PATCH 2/3] adding a loader for the bin packing problem
+
+---
+ libecole/CMakeLists.txt                       |   1 +
+ .../include/ecole/instance/bin-packing.hpp    |  42 +++
+ libecole/src/instance/bin-packing.cpp         | 293 ++++++++++++++++++
+ python/ecole/src/ecole/core/instance.cpp      |  26 ++
+ 4 files changed, 362 insertions(+)
+ create mode 100644 libecole/include/ecole/instance/bin-packing.hpp
+ create mode 100644 libecole/src/instance/bin-packing.cpp
+
+diff --git a/libecole/CMakeLists.txt b/libecole/CMakeLists.txt
+index 1eab347..55ea583 100644
+--- a/libecole/CMakeLists.txt
++++ b/libecole/CMakeLists.txt
+@@ -22,6 +22,7 @@ add_library(
+ 	src/instance/combinatorial-auction.cpp
+ 	src/instance/capacitated-facility-location.cpp
+ 	src/instance/capacitated-vehicle-routing.cpp
++	src/instance/bin-packing.cpp
+ 
+ 	src/reward/is-done.cpp
+ 	src/reward/lp-iterations.cpp
+diff --git a/libecole/include/ecole/instance/bin-packing.hpp b/libecole/include/ecole/instance/bin-packing.hpp
+new file mode 100644
+index 0000000..a36a13e
+--- /dev/null
++++ b/libecole/include/ecole/instance/bin-packing.hpp
+@@ -0,0 +1,42 @@
++#ifndef BIN_PACKING_HPP
++#define BIN_PACKING_HPP
++#pragma once
++
++#include <cstddef>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "ecole/export.hpp"
++#include "ecole/instance/abstract.hpp"
++#include "ecole/random.hpp"
++
++namespace ecole::instance {
++
++class ECOLE_EXPORT Binpacking : public InstanceGenerator {
++public:
++	struct ECOLE_EXPORT Parameters {
++		std::string filename;  // NOLINT(readability-magic-numbers)
++		std::size_t n_bins;    // NOLINT(readability-magic-numbers)
++	};
++
++	ECOLE_EXPORT static scip::Model generate_instance(Parameters parameters, RandomGenerator& rng);
++
++	ECOLE_EXPORT Binpacking(Parameters parameters, RandomGenerator rng);
++	ECOLE_EXPORT Binpacking(Parameters parameters);
++	ECOLE_EXPORT Binpacking();
++
++	ECOLE_EXPORT scip::Model next() override;
++	ECOLE_EXPORT void seed(Seed seed) override;
++	[[nodiscard]] ECOLE_EXPORT bool done() const override { return false; }
++
++	[[nodiscard]] ECOLE_EXPORT Parameters const& get_parameters() const noexcept { return parameters; }
++
++private:
++	RandomGenerator rng;
++	Parameters parameters;
++};
++
++}  // namespace ecole::instance
++
++#endif
+diff --git a/libecole/src/instance/bin-packing.cpp b/libecole/src/instance/bin-packing.cpp
+new file mode 100644
+index 0000000..2e41ec6
+--- /dev/null
++++ b/libecole/src/instance/bin-packing.cpp
+@@ -0,0 +1,293 @@
++#include <array>
++#include <cstddef>
++#include <fstream>
++#include <iostream>
++#include <memory>
++#include <scip/type_var.h>
++#include <string>
++#include <utility>
++#include <vector>
++
++#include "ecole/instance/bin-packing.hpp"
++#include "ecole/scip/cons.hpp"
++#include "ecole/scip/model.hpp"
++#include "ecole/scip/utils.hpp"
++#include "ecole/scip/var.hpp"
++#include <fmt/format.h>
++#include <range/v3/view/enumerate.hpp>
++#include <xtensor/xadapt.hpp>
++#include <xtensor/xbuilder.hpp>
++#include <xtensor/xio.hpp>
++#include <xtensor/xmath.hpp>
++#include <xtensor/xrandom.hpp>
++#include <xtensor/xtensor.hpp>
++#include <xtensor/xview.hpp>
++
++namespace ecole::instance {
++
++/**************************************************
++ *  Binpacking methods  *
++ **************************************************/
++
++Binpacking::Binpacking(Binpacking::Parameters parameters_, RandomGenerator rng_) :
++	rng{rng_}, parameters{std::move(parameters_)} {}
++Binpacking::Binpacking(Binpacking::Parameters parameters_) : Binpacking{parameters_, ecole::spawn_random_generator()} {}
++Binpacking::Binpacking() : Binpacking(Parameters{}) {}
++
++scip::Model Binpacking::next() {
++	return generate_instance(parameters, rng);
++}
++
++void Binpacking::seed(Seed seed) {
++	rng.seed(seed);
++}
++
++/*************************************************************
++ *  Binpacking::generate_instance  *
++ *************************************************************/
++
++namespace {
++
++using value_type = SCIP_Real;
++using xvector = xt::xtensor<value_type, 1>;
++using xmatrix = xt::xtensor<value_type, 2>;
++
++auto read_problem(
++	std::string& filename, /**< filename */
++	int& n_items,          /**< capacity in instance */
++	int& capacity,
++	std::vector<double>& weights /**< array of demands of instance */
++) {
++
++	SCIP_FILE* file;
++	SCIP_Bool error;
++	char name[SCIP_MAXSTRLEN];
++	char format[16];
++	char buffer[SCIP_MAXSTRLEN];
++	int bestsolvalue;
++	int nread;
++	int weight;
++	int n_weights;
++	int lineno;
++
++	file = SCIPfopen(filename.c_str(), "r");
++	/* open file */
++	if (file == NULL) {
++		std::cerr << fmt::format("cannot open file <{}> for reading\n", filename);
++		SCIPprintSysError(filename.c_str());
++		return SCIP_NOFILE;
++	}
++
++	lineno = 0;
++	std::cout << name << "++ uninitialized ++";
++
++	/* read problem name */
++	if (!SCIPfeof(file)) {
++		/* get next line */
++		if (SCIPfgets(buffer, (int)sizeof(buffer), file) == NULL) return SCIP_READERROR;
++		lineno++;
++
++		/* parse dimension line */
++		sprintf(format, "%%%ds\n", SCIP_MAXSTRLEN);
++		nread = sscanf(buffer, format, name);
++		if (nread == 0) {
++			std::cerr << fmt::format("invalid input line {} in file <{}>: <{}>\n", lineno, filename, buffer);
++			return SCIP_READERROR;
++		}
++
++		std::cout << fmt::format("problem name <{}>\n", name);
++	}
++
++	capacity = 0;
++	n_items = 0;
++
++	/* read problem dimension */
++	if (!SCIPfeof(file)) {
++		/* get next line */
++		if (SCIPfgets(buffer, (int)sizeof(buffer), file) == NULL) return SCIP_READERROR;
++		lineno++;
++
++		/* parse dimension line */
++		nread = sscanf(buffer, "%d %d %d\n", &capacity, &n_items, &bestsolvalue);
++		if (nread < 2) {
++			std::cerr << fmt::format("invalid input line {} in file <{}>: <{}>\n", lineno, filename, buffer);
++			return SCIP_READERROR;
++		}
++
++		std::cerr << fmt::format(
++			"capacity = <{}>, number of items = <{}>, best known solution = <{}>\n", capacity, n_items, bestsolvalue);
++	}
++
++	/* parse weights */
++	weights.resize(n_items, 0);
++	n_weights = 0;
++	error = FALSE;
++
++	while (!SCIPfeof(file) && !error) {
++		/* get next line */
++		if (SCIPfgets(buffer, (int)sizeof(buffer), file) == NULL) break;
++		lineno++;
++
++		/* parse the line */
++		nread = sscanf(buffer, "%d\n", &weight);
++		if (nread == 0) {
++			std::cerr << fmt::format("invalid input line {} in file <{}>: <{}>\n", lineno, filename, buffer);
++			error = TRUE;
++			break;
++		}
++
++		weights[n_weights] = weight;
++		n_weights++;
++
++		if (n_weights == n_items) break;
++	}
++
++	if (n_weights < n_items) {
++		std::cerr << fmt::format(
++			"set n_items from <{}> to <{}> since the file <{}> only contains <{}> weights\n",
++			n_items,
++			n_weights,
++			filename,
++			n_weights);
++		n_items = n_weights;
++	}
++
++	(void)SCIPfclose(file);
++
++	if (error) return SCIP_READERROR;
++	return SCIP_OKAY;
++}
++
++/** Create and add a single continuous variable the for the fraction of item weight (customer demand) served by the bin
++ * (vehicle).
++ *
++ * Variables are automatically released (using the unique_ptr provided by scip::create_var_basic) after being captured
++ * by the scip*. Their lifetime should not exceed that of the scip* (although that was already implied when creating
++ * them).
++ */
++auto add_items_var(SCIP* scip, std::size_t i, std::size_t j, SCIP_Real cost, bool continuous) -> SCIP_VAR* {
++	auto const name = fmt::format("x_{}_{}", i, j);
++	auto unique_var = scip::create_var_basic(
++		scip, name.c_str(), 0.0, 1.0, 0.0, /*add options for continuous variables */ SCIP_VARTYPE_BINARY);
++	auto* var_ptr = unique_var.get();
++	scip::call(SCIPaddVar, scip, var_ptr);
++	return var_ptr;
++}
++
++/** Create and add all variables for accumulated_weights the fraction of items weights (customer demands) from bins
++ * (vehicles).
++ *
++ * Variables pointers are returned in a symmetric n_customers matrix .
++ */
++auto add_bins_items_vars(SCIP* scip, int n_bins, int n_items, xvector const& weights, bool continuous) {
++	// symmetric matrix
++	assert(weights.size() == n_items);
++
++	auto vars = xt::xtensor<SCIP_VAR*, 2>{{n_bins, n_items}, nullptr};
++	for (std::size_t i = 0; i < n_bins; ++i) {
++		for (std::size_t j = 0; j < n_items; ++j) {
++			vars(i, j) = add_items_var(scip, i, j, weights[j], continuous);
++		}
++	}
++	return vars;
++}
++
++/** Create and add a single integer variable the representing the assignment of the item.
++ *
++ * Variables are automatically released (using the unique_ptr provided by scip::create_var_basic) after being captured
++ * by the scip*. Their lifetime should not exceed that of the scip* (although that was already implied when creating
++ * them).
++ */
++auto add_bins_var(SCIP* scip, std::size_t idx, double bin_cost) -> SCIP_VAR* {
++	auto const name = fmt::format("y_{}", idx);
++	auto unique_var = scip::create_var_basic(scip, name.c_str(), 0., 1., bin_cost, SCIP_VARTYPE_BINARY);
++	auto* var_ptr = unique_var.get();
++	scip::call(SCIPaddVar, scip, var_ptr);
++	return var_ptr;
++}
++
++auto add_bins_vars(SCIP* scip, std::size_t n_bins, double bin_cost) {
++	auto vars = xt::xtensor<SCIP_VAR*, 1>({n_bins}, nullptr);
++	auto* out_iter = vars.begin();
++	for (std::size_t i = 0; i < n_bins; ++i) {
++		*(out_iter++) = add_bins_var(scip, i, bin_cost);
++	}
++	return vars;
++}
++
++/* capacity constraints */
++auto add_capacity_cons(
++	SCIP* scip,
++	xt::xtensor<SCIP_VAR*, 2> const& bins_items_vars,
++	xt::xtensor<SCIP_VAR*, 1> const& bins_vars,
++	xvector const& weights,
++	int capacity) -> void {
++
++	auto const inf = SCIPinfinity(scip);
++
++	auto const [n_bins, n_items] = bins_items_vars.shape();
++
++	assert(weights.size() == n_items);
++
++	std::vector<value_type> coefs(weights.begin(), weights.end());
++	coefs.push_back(-(SCIP_Real)capacity);
++
++	assert(coefs.size() == n_items + 1);
++
++	std::vector<std::size_t> shape = {n_items + 1};
++	for (std::size_t i = 0; i < n_bins; ++i) {
++		auto const name = fmt::format("c_{}", i);
++		auto bins_items_vars_row = xt::row(bins_items_vars, i);
++		std::vector<SCIP_VAR*> vars(bins_items_vars_row.begin(), bins_items_vars_row.end());
++		vars.push_back(bins_vars(i));
++		auto cons = scip::create_cons_basic_linear(scip, name.c_str(), vars.size(), vars.data(), coefs.data(), -inf, 0.);
++		scip::call(SCIPaddCons, scip, cons.get());
++	}
++}
++
++// ensures that each item is packed only once (tightening)
++auto add_tightening_cons(SCIP* scip, xt::xtensor<SCIP_VAR*, 2> bins_items_vars) -> void {
++	auto const inf = SCIPinfinity(scip);
++
++	auto const [n_bins, n_items] = bins_items_vars.shape();
++	for (std::size_t i = 0; i < n_items; ++i) {
++		auto name = fmt::format("tightening_cons_item_{}", i);
++		auto const coefs = xvector({n_bins}, 1.);
++		auto row = xt::col(bins_items_vars, i);
++		std::vector<SCIP_VAR*> vars(row.begin(), row.end());
++		auto cons = scip::create_cons_basic_linear(scip, name.c_str(), n_bins, vars.data(), coefs.data(), 1.0, 1.0);
++		scip::call(SCIPaddCons, scip, cons.get());
++	}
++}
++
++}  // namespace
++
++scip::Model Binpacking::generate_instance(Binpacking::Parameters parameters, RandomGenerator& rng) {
++
++	double bin_cost = 1.0;               // NOLINT(readability-magic-numbers)
++	int capacity;                        // NOLINT(readability-magic-numbers)
++	int n_items;                         // NOLINT(readability-magic-numbers)
++	bool continuous_assignment = false;  // NOLINT(readability-magic-numbers)
++	std::vector<double> weights;         // NOLINT(readability-magic-numbers)
++
++	if (!read_problem(parameters.filename, n_items, capacity, weights)) {
++		throw SCIP_READERROR;
++	}
++
++	auto xweights = static_cast<xvector>(xt::adapt(weights));
++
++	auto model = scip::Model::prob_basic();
++	model.set_name(fmt::format("Binpacking-{}-{}", parameters.n_bins, n_items));
++
++	auto* const scip = model.get_scip_ptr();
++
++	auto const bins_vars = add_bins_vars(scip, parameters.n_bins, bin_cost);
++	auto const bins_items_vars = add_bins_items_vars(scip, parameters.n_bins, n_items, xweights, continuous_assignment);
++
++	add_capacity_cons(scip, bins_items_vars, bins_vars, xweights, capacity);
++	add_tightening_cons(scip, bins_items_vars);
++
++	return model;
++}
++
++}  // namespace ecole::instance
+diff --git a/python/ecole/src/ecole/core/instance.cpp b/python/ecole/src/ecole/core/instance.cpp
+index 614da25..7527fb8 100644
+--- a/python/ecole/src/ecole/core/instance.cpp
++++ b/python/ecole/src/ecole/core/instance.cpp
+@@ -3,6 +3,7 @@
+ 
+ #include <pybind11/pybind11.h>
+ 
++#include "ecole/instance/bin-packing.hpp"
+ #include "ecole/instance/capacitated-facility-location.hpp"
+ #include "ecole/instance/capacitated-vehicle-routing.hpp"
+ #include "ecole/instance/combinatorial-auction.hpp"
+@@ -365,6 +366,31 @@ void bind_submodule(py::module const& m) {
+ 	def_iterator(capacitated_vehicle_routing_load);
+ 	capacitated_vehicle_routing_load.def("seed", &CapacitatedVehicleRoutingLoader::seed, py::arg(" seed"));
+ 
++	// The Binpacking parameters used in constructor, generate_instance, and attributes
++	auto constexpr binpacking_params = std::tuple{
++		Member{"filename", &Binpacking::Parameters::filename},
++		Member{"n_bins", &Binpacking::Parameters::n_bins},
++	};
++	// Bind Binpacking and remove intermediate Parameter class
++	auto binpacking_load = py::class_<Binpacking>{m, "Binpacking"};
++	def_generate_instance(binpacking_load, binpacking_params, R"(
++		Load a Binpacking MILP problem instance.
++
++    The Bin-packing Problem (BPP) can be described, using the terminology of knapsack problems, as follows. Given $n$ items and $m$ knapsacks (or bins), with $w_j$ = weight of each item j, $c$ = capacity of each bin. Assign each item to one bin so that the total weight doesn't exceed its capacity and the number of bins used is minimum.
++
++    The same problem can be used to determine the number of minimum vehicles in Vehicle Routing Problem where bins represent vehicles and items represent customers demands.
++
++		Parameters
++		----------
++    filename:
++      The Binpacking problem file.
++    n_bins:
++      The number of bins available.
++	)");
++	def_init(binpacking_load, binpacking_params);
++	def_attributes(binpacking_load, binpacking_params);
++	def_iterator(binpacking_load);
++	binpacking_load.def("seed", &Binpacking::seed, py::arg(" seed"));
+ }
+ 
+ /******************************************
+-- 
+2.39.0
+
+
+From e6ebddf627fe1d3e87cb9f04bc82f168851afd55 Mon Sep 17 00:00:00 2001
+From: ndrwnaguib <24280372+ndrwnaguib@users.noreply.github.com>
+Date: Wed, 15 Feb 2023 18:22:26 -0800
+Subject: [PATCH 3/3] adding B&B tree size as a reward function
+
+---
+ libecole/CMakeLists.txt                       |  1 +
+ .../ecole/reward/tree-size-estimate.hpp       | 23 +++++++++++++++++++
+ libecole/src/reward/tree-size-estimate.cpp    | 16 +++++++++++++
+ python/ecole/src/ecole/core/reward.cpp        | 15 ++++++++++++
+ 4 files changed, 55 insertions(+)
+ create mode 100644 libecole/include/ecole/reward/tree-size-estimate.hpp
+ create mode 100644 libecole/src/reward/tree-size-estimate.cpp
+
+diff --git a/libecole/CMakeLists.txt b/libecole/CMakeLists.txt
+index 55ea583..d92962c 100644
+--- a/libecole/CMakeLists.txt
++++ b/libecole/CMakeLists.txt
+@@ -28,6 +28,7 @@ add_library(
+ 	src/reward/lp-iterations.cpp
+ 	src/reward/solving-time.cpp
+ 	src/reward/n-nodes.cpp
++	src/reward/tree-size-estimate.cpp
+ 	src/reward/bound-integral.cpp
+ 
+ 	src/observation/node-bipartite.cpp
+diff --git a/libecole/include/ecole/reward/tree-size-estimate.hpp b/libecole/include/ecole/reward/tree-size-estimate.hpp
+new file mode 100644
+index 0000000..3b108d8
+--- /dev/null
++++ b/libecole/include/ecole/reward/tree-size-estimate.hpp
+@@ -0,0 +1,23 @@
++#pragma once
++
++#include <cstdint>
++
++#include "ecole/export.hpp"
++#include "ecole/reward/abstract.hpp"
++#include "scip/event_estim.h"
++#include "scip/scip_event.h"
++
++#define EVENTHDLR_NAME "estim"
++
++namespace ecole::reward {
++
++class ECOLE_EXPORT TreeSizeEstimate {
++public:
++	ECOLE_EXPORT auto before_reset(scip::Model& model) -> void;
++	ECOLE_EXPORT auto extract(scip::Model& model, bool done = false) -> Reward;
++
++private:
++	SCIP_Real tree_size_estimate = 0.0;
++};
++
++}  // namespace ecole::reward
+diff --git a/libecole/src/reward/tree-size-estimate.cpp b/libecole/src/reward/tree-size-estimate.cpp
+new file mode 100644
+index 0000000..6e87e93
+--- /dev/null
++++ b/libecole/src/reward/tree-size-estimate.cpp
+@@ -0,0 +1,16 @@
++#include "ecole/reward/tree-size-estimate.hpp"
++
++#include "ecole/scip/model.hpp"
++#include "scip/def.h"
++
++namespace ecole::reward {
++
++void TreeSizeEstimate::before_reset(scip::Model& /* model */) {}
++
++Reward TreeSizeEstimate::extract(scip::Model& model, bool /* done */) {
++	// getTreeSizeEstimation returns -1 when no estimation has been made yet.
++	tree_size_estimate = SCIPgetTreesizeEstimation(model.get_scip_ptr());
++	return tree_size_estimate;
++}
++
++}  // namespace ecole::reward
+diff --git a/python/ecole/src/ecole/core/reward.cpp b/python/ecole/src/ecole/core/reward.cpp
+index 984c7b3..0173dcf 100644
+--- a/python/ecole/src/ecole/core/reward.cpp
++++ b/python/ecole/src/ecole/core/reward.cpp
+@@ -11,6 +11,7 @@
+ #include "ecole/reward/lp-iterations.hpp"
+ #include "ecole/reward/n-nodes.hpp"
+ #include "ecole/reward/solving-time.hpp"
++#include "ecole/reward/tree-size-estimate.hpp"
+ #include "ecole/scip/model.hpp"
+ 
+ #include "core.hpp"
+@@ -147,6 +148,20 @@ void bind_submodule(py::module_ const& m) {
+ 		The difference in number of nodes is computed in between calls.
+ 		)");
+ 
++	auto treesizeestimate = py::class_<TreeSizeEstimate>(m, "TreeSizeEstimate", R"(
++		Estimate the size of a tree.
++
++		The reward is defined as the total number of nodes processed since the previous state.
++	)");
++	treesizeestimate.def(py::init<>());
++	def_operators(treesizeestimate);
++	def_before_reset(treesizeestimate, "Reset the internal node count.");
++	def_extract(treesizeestimate, R"(
++		Update the internal node count and return the difference.
++
++		The difference in number of nodes is computed in between calls.
++		)");
++
+ 	auto solvingtime = py::class_<SolvingTime>(m, "SolvingTime", R"(
+ 		Solving time difference.
+ 
+-- 
+2.39.0
+

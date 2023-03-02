@@ -60,6 +60,14 @@ Then our fork of [[https://github.com/ds4dm/ecole][École]]:
 #+begin_src
   git clone git@github.com:ndrwnaguib/ecole.git
 #+end_src
+
+or, equivalently, cloning the original source code of École and patching it using:
+#+begin_src
+  git clone git@github.com:ds4dm/ecole.git
+  cd ecole
+  patch -p1 < ../ecole.patch
+#+end_src
+
 And eventually, SCIP, which is the underlying mathematical solver where we
 replace the branching strategies with trained classifiers, [[https://scipopt.org/index.php#download][from here]]. Once the
 precomplied version have been extracted, install école using:
