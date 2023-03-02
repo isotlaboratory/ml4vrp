@@ -5,9 +5,11 @@
 #+LATEX_CLASS_OPTIONS: [american]
 #+latex_header: \usepackage{optidef}
 #+latex_header: \usepackage{amsfonts,amsmath,amsthm,amssymb,bm}
-#+title:  On Statistical Learning of Branch and Bound for Vehicle Routing Optimization @@html: <IMG SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"/> <br>@@ 
-#+description: This repository contains the code for reproducing the experiments conducted in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
+#+title:  On Statistical Learning of Branch and Bound for Vehicle Routing Optimization
+#+description: This repository contains the code for reproducing the experiments performed in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
 
+
+This repository contains the code for reproducing the experiments performed in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
 
 * Vehicle Routing Problem
 The violet lines represent integer but not feasible solutions, once a feasible
@@ -18,7 +20,6 @@ lines fumbling around represent the LP-relaxed problem.
 
 #+BEGIN_CENTER
 #+CAPTION: Solving topologically different VRP instances using modified versions of [[https://arxiv.org/abs/1906.01629][GCNN]], [[https://arxiv.org/abs/1706.02216][GraphSAGE]], and [[https://arxiv.org/abs/1710.10903][GAT]].
-|            <c>            |              <c>               |           <c>            |
 |           GCNN            |           GraphSAGE            |           GAT            |
 |---------------------------+--------------------------------+--------------------------|
 | [[./gifs/P-n55-k10_GCNN.gif]] | [[./gifs/P-n55-k10_GraphSAGE.gif]] | [[./gifs/P-n55-k10_GAT.gif]] |
