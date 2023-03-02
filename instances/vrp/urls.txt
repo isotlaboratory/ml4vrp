@@ -1,0 +1,10 @@
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-A.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-B.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-E.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-F.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-M.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-P.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-CMT.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-tai.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-Golden.zip
+http://vrp.galgos.inf.puc-rio.br/media/com_vrp/instances/Vrp-Set-XXL.zip
