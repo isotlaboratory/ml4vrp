@@ -1,0 +1,511 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
+<head>
+<!-- 2023-07-27 Thu 10:48 -->
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>On Statistical Learning of Branch and Bound for Vehicle Routing Optimization @@html: &lt;IMG SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"/&gt; &lt;br&gt;@@</title>
+<meta name="author" content="Andrew A. N." />
+<meta name="description" content="This repository contains the code for reproducing the experiments conducted in the &quot;On Statistical Learning of Branch and Bound for Vehicle Routing Optimization&quot; research paper." />
+<meta name="generator" content="Org Mode" />
+<style>
+  #content { max-width: 60em; margin: auto; }
+  .title  { text-align: center;
+             margin-bottom: .2em; }
+  .subtitle { text-align: center;
+              font-size: medium;
+              font-weight: bold;
+              margin-top:0; }
+  .todo   { font-family: monospace; color: red; }
+  .done   { font-family: monospace; color: green; }
+  .priority { font-family: monospace; color: orange; }
+  .tag    { background-color: #eee; font-family: monospace;
+            padding: 2px; font-size: 80%; font-weight: normal; }
+  .timestamp { color: #bebebe; }
+  .timestamp-kwd { color: #5f9ea0; }
+  .org-right  { margin-left: auto; margin-right: 0px;  text-align: right; }
+  .org-left   { margin-left: 0px;  margin-right: auto; text-align: left; }
+  .org-center { margin-left: auto; margin-right: auto; text-align: center; }
+  .underline { text-decoration: underline; }
+  #postamble p, #preamble p { font-size: 90%; margin: .2em; }
+  p.verse { margin-left: 3%; }
+  pre {
+    border: 1px solid #e6e6e6;
+    border-radius: 3px;
+    background-color: #f2f2f2;
+    padding: 8pt;
+    font-family: monospace;
+    overflow: auto;
+    margin: 1.2em;
+  }
+  pre.src {
+    position: relative;
+    overflow: auto;
+  }
+  pre.src:before {
+    display: none;
+    position: absolute;
+    top: -8px;
+    right: 12px;
+    padding: 3px;
+    color: #555;
+    background-color: #f2f2f299;
+  }
+  pre.src:hover:before { display: inline; margin-top: 14px;}
+  /* Languages per Org manual */
+  pre.src-asymptote:before { content: 'Asymptote'; }
+  pre.src-awk:before { content: 'Awk'; }
+  pre.src-authinfo::before { content: 'Authinfo'; }
+  pre.src-C:before { content: 'C'; }
+  /* pre.src-C++ doesn't work in CSS */
+  pre.src-clojure:before { content: 'Clojure'; }
+  pre.src-css:before { content: 'CSS'; }
+  pre.src-D:before { content: 'D'; }
+  pre.src-ditaa:before { content: 'ditaa'; }
+  pre.src-dot:before { content: 'Graphviz'; }
+  pre.src-calc:before { content: 'Emacs Calc'; }
+  pre.src-emacs-lisp:before { content: 'Emacs Lisp'; }
+  pre.src-fortran:before { content: 'Fortran'; }
+  pre.src-gnuplot:before { content: 'gnuplot'; }
+  pre.src-haskell:before { content: 'Haskell'; }
+  pre.src-hledger:before { content: 'hledger'; }
+  pre.src-java:before { content: 'Java'; }
+  pre.src-js:before { content: 'Javascript'; }
+  pre.src-latex:before { content: 'LaTeX'; }
+  pre.src-ledger:before { content: 'Ledger'; }
+  pre.src-lisp:before { content: 'Lisp'; }
+  pre.src-lilypond:before { content: 'Lilypond'; }
+  pre.src-lua:before { content: 'Lua'; }
+  pre.src-matlab:before { content: 'MATLAB'; }
+  pre.src-mscgen:before { content: 'Mscgen'; }
+  pre.src-ocaml:before { content: 'Objective Caml'; }
+  pre.src-octave:before { content: 'Octave'; }
+  pre.src-org:before { content: 'Org mode'; }
+  pre.src-oz:before { content: 'OZ'; }
+  pre.src-plantuml:before { content: 'Plantuml'; }
+  pre.src-processing:before { content: 'Processing.js'; }
+  pre.src-python:before { content: 'Python'; }
+  pre.src-R:before { content: 'R'; }
+  pre.src-ruby:before { content: 'Ruby'; }
+  pre.src-sass:before { content: 'Sass'; }
+  pre.src-scheme:before { content: 'Scheme'; }
+  pre.src-screen:before { content: 'Gnu Screen'; }
+  pre.src-sed:before { content: 'Sed'; }
+  pre.src-sh:before { content: 'shell'; }
+  pre.src-sql:before { content: 'SQL'; }
+  pre.src-sqlite:before { content: 'SQLite'; }
+  /* additional languages in org.el's org-babel-load-languages alist */
+  pre.src-forth:before { content: 'Forth'; }
+  pre.src-io:before { content: 'IO'; }
+  pre.src-J:before { content: 'J'; }
+  pre.src-makefile:before { content: 'Makefile'; }
+  pre.src-maxima:before { content: 'Maxima'; }
+  pre.src-perl:before { content: 'Perl'; }
+  pre.src-picolisp:before { content: 'Pico Lisp'; }
+  pre.src-scala:before { content: 'Scala'; }
+  pre.src-shell:before { content: 'Shell Script'; }
+  pre.src-ebnf2ps:before { content: 'ebfn2ps'; }
+  /* additional language identifiers per "defun org-babel-execute"
+       in ob-*.el */
+  pre.src-cpp:before  { content: 'C++'; }
+  pre.src-abc:before  { content: 'ABC'; }
+  pre.src-coq:before  { content: 'Coq'; }
+  pre.src-groovy:before  { content: 'Groovy'; }
+  /* additional language identifiers from org-babel-shell-names in
+     ob-shell.el: ob-shell is the only babel language using a lambda to put
+     the execution function name together. */
+  pre.src-bash:before  { content: 'bash'; }
+  pre.src-csh:before  { content: 'csh'; }
+  pre.src-ash:before  { content: 'ash'; }
+  pre.src-dash:before  { content: 'dash'; }
+  pre.src-ksh:before  { content: 'ksh'; }
+  pre.src-mksh:before  { content: 'mksh'; }
+  pre.src-posh:before  { content: 'posh'; }
+  /* Additional Emacs modes also supported by the LaTeX listings package */
+  pre.src-ada:before { content: 'Ada'; }
+  pre.src-asm:before { content: 'Assembler'; }
+  pre.src-caml:before { content: 'Caml'; }
+  pre.src-delphi:before { content: 'Delphi'; }
+  pre.src-html:before { content: 'HTML'; }
+  pre.src-idl:before { content: 'IDL'; }
+  pre.src-mercury:before { content: 'Mercury'; }
+  pre.src-metapost:before { content: 'MetaPost'; }
+  pre.src-modula-2:before { content: 'Modula-2'; }
+  pre.src-pascal:before { content: 'Pascal'; }
+  pre.src-ps:before { content: 'PostScript'; }
+  pre.src-prolog:before { content: 'Prolog'; }
+  pre.src-simula:before { content: 'Simula'; }
+  pre.src-tcl:before { content: 'tcl'; }
+  pre.src-tex:before { content: 'TeX'; }
+  pre.src-plain-tex:before { content: 'Plain TeX'; }
+  pre.src-verilog:before { content: 'Verilog'; }
+  pre.src-vhdl:before { content: 'VHDL'; }
+  pre.src-xml:before { content: 'XML'; }
+  pre.src-nxml:before { content: 'XML'; }
+  /* add a generic configuration mode; LaTeX export needs an additional
+     (add-to-list 'org-latex-listings-langs '(conf " ")) in .emacs */
+  pre.src-conf:before { content: 'Configuration File'; }
+
+  table { border-collapse:collapse; }
+  caption.t-above { caption-side: top; }
+  caption.t-bottom { caption-side: bottom; }
+  td, th { vertical-align:top;  }
+  th.org-right  { text-align: center;  }
+  th.org-left   { text-align: center;   }
+  th.org-center { text-align: center; }
+  td.org-right  { text-align: right;  }
+  td.org-left   { text-align: left;   }
+  td.org-center { text-align: center; }
+  dt { font-weight: bold; }
+  .footpara { display: inline; }
+  .footdef  { margin-bottom: 1em; }
+  .figure { padding: 1em; }
+  .figure p { text-align: center; }
+  .equation-container {
+    display: table;
+    text-align: center;
+    width: 100%;
+  }
+  .equation {
+    vertical-align: middle;
+  }
+  .equation-label {
+    display: table-cell;
+    text-align: right;
+    vertical-align: middle;
+  }
+  .inlinetask {
+    padding: 10px;
+    border: 2px solid gray;
+    margin: 10px;
+    background: #ffffcc;
+  }
+  #org-div-home-and-up
+   { text-align: right; font-size: 70%; white-space: nowrap; }
+  textarea { overflow-x: auto; }
+  .linenr { font-size: smaller }
+  .code-highlighted { background-color: #ffff00; }
+  .org-info-js_info-navigation { border-style: none; }
+  #org-info-js_console-label
+    { font-size: 10px; font-weight: bold; white-space: nowrap; }
+  .org-info-js_search-highlight
+    { background-color: #ffff00; color: #000000; font-weight: bold; }
+  .org-svg { }
+</style>
+<style> td img {width: 80%;} </style>
+</head>
+<body>
+<div id="content" class="content">
+<h1 class="title">On Statistical Learning of Branch and Bound for Vehicle Routing Optimization  <IMG SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"/> <br></h1>
+<div id="table-of-contents" role="doc-toc">
+<h2>Table of Contents</h2>
+<div id="text-table-of-contents" role="doc-toc">
+<ul>
+<li><a href="#org2ce3c5e">1. Vehicle Routing Problem</a>
+<ul>
+<li><a href="#org7e0f5d8">1.1. Integer Program</a></li>
+</ul>
+</li>
+<li><a href="#org0913d22">2. Bin Packing Problem</a>
+<ul>
+<li><a href="#org0a391b4">2.1. Integer Program</a></li>
+</ul>
+</li>
+<li><a href="#org61df026">3. Installation</a>
+<ul>
+<li><a href="#orge844bac">3.1. Optimization Problems Instances</a></li>
+</ul>
+</li>
+<li><a href="#org7fcce50">4. Usage Instructions</a>
+<ul>
+<li><a href="#orgb4c768f">4.1. Sampling</a>
+<ul>
+<li><a href="#orgf5c503e">4.1.1. Research sampled datasets</a></li>
+</ul>
+</li>
+<li><a href="#orge529e5d">4.2. Training</a></li>
+<li><a href="#orgc0c2b43">4.3. Evaluation</a>
+<ul>
+<li><a href="#org33d5729">4.3.1. Pre-trained Models</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</div>
+
+
+<div id="outline-container-org2ce3c5e" class="outline-2">
+<h2 id="org2ce3c5e"><span class="section-number-2">1.</span> Vehicle Routing Problem</h2>
+<div class="outline-text-2" id="text-1">
+<p>
+The violet lines represent integer but not feasible solutions, once a feasible
+solution has been found, the paths are distinguished by colors. The light blue
+lines fumbling around represent the LP-relaxed problem.
+</p>
+<div class="org-center">
+nil</div>
+
+<div class="org-center">
+<table border="2" cellspacing="0" cellpadding="6" rules="groups" frame="hsides">
+<caption class="t-above"><span class="table-number">Table 1:</span> Solving topologically different VRP instances using modified versions of <a href="https://arxiv.org/abs/1906.01629">GCNN</a>, <a href="https://arxiv.org/abs/1706.02216">GraphSAGE</a>, and <a href="https://arxiv.org/abs/1710.10903">GAT</a>.</caption>
+
+<colgroup>
+<col  class="org-center" />
+
+<col  class="org-center" />
+
+<col  class="org-center" />
+</colgroup>
+<thead>
+<tr>
+<th scope="col" class="org-center">GCNN</th>
+<th scope="col" class="org-center">GraphSAGE</th>
+<th scope="col" class="org-center">GAT</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="org-center"><img src="./gifs/P-n55-k10_GCNN.gif" alt="P-n55-k10_GCNN.gif" /></td>
+<td class="org-center"><img src="./gifs/P-n55-k10_GraphSAGE.gif" alt="P-n55-k10_GraphSAGE.gif" /></td>
+<td class="org-center"><img src="./gifs/P-n55-k10_GAT.gif" alt="P-n55-k10_GAT.gif" /></td>
+</tr>
+
+<tr>
+<td class="org-center"><img src="./gifs/B-n66-k9_GAT.gif" alt="B-n66-k9_GAT.gif" /></td>
+<td class="org-center"><img src="./gifs/B-n66-k9_GraphSAGE.gif" alt="B-n66-k9_GraphSAGE.gif" /></td>
+<td class="org-center"><img src="./gifs/B-n66-k9_GAT.gif" alt="B-n66-k9_GAT.gif" /></td>
+</tr>
+
+<tr>
+<td class="org-center"><img src="./gifs/E-n76-k8_GCNN.gif" alt="E-n76-k8_GCNN.gif" /></td>
+<td class="org-center"><img src="./gifs/E-n76-k8_GraphSAGE.gif" alt="E-n76-k8_GraphSAGE.gif" /></td>
+<td class="org-center"><img src="./gifs/E-n76-k8_GAT.gif" alt="E-n76-k8_GAT.gif" /></td>
+</tr>
+
+<tr>
+<td class="org-center"><img src="./gifs/P-n55-k15.gif" alt="P-n55-k15.gif" /></td>
+<td class="org-center"><img src="./gifs/P-n55-k15_GraphSAGE.gif" alt="P-n55-k15_GraphSAGE.gif" /></td>
+<td class="org-center"><img src="./gifs/P-n55-k15_GAT.gif" alt="P-n55-k15_GAT.gif" /></td>
+</tr>
+
+<tr>
+<td class="org-center"><img src="./imgs/gcnn.png" alt="gcnn.png" /></td>
+<td class="org-center"><img src="./imgs/graph_sage.png" alt="graph_sage.png" /></td>
+<td class="org-center"><img src="./imgs/gat.png" alt="gat.png" /></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+
+<div id="outline-container-org7e0f5d8" class="outline-3">
+<h3 id="org7e0f5d8"><span class="section-number-3">1.1.</span> Integer Program</h3>
+<div class="outline-text-3" id="text-1-1">
+
+<div id="orgca46fa0" class="figure">
+<p><img src="./imgs/cvrp_ip.png" alt="cvrp_ip.png" width="300pt" />
+</p>
+</div>
+</div>
+</div>
+</div>
+
+
+<div id="outline-container-org0913d22" class="outline-2">
+<h2 id="org0913d22"><span class="section-number-2">2.</span> Bin Packing Problem</h2>
+<div class="outline-text-2" id="text-2">
+<p>
+Although BPP classifiers can be used/trained independently, the original motive
+for this research was to provide a means to calculating the minimum number of
+required vehicles for solving a VRP instance. The blue boxes, filling the right
+side of the bin, analogously, represent the LP-relaxed problem (which are
+cruising out of the bins since they have less constraints :).
+</p>
+<div class="org-center">
+
+<div id="org2372028" class="figure">
+<p><img src="./gifs/u80_00_GCNN.gif" alt="u80_00_GCNN.gif" width="90%" />
+</p>
+<p><span class="figure-number">Figure 1: </span>Distributing 80 weighted items across 48 bins using GraphSAGE</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org0a391b4" class="outline-3">
+<h3 id="org0a391b4"><span class="section-number-3">2.1.</span> Integer Program</h3>
+<div class="outline-text-3" id="text-2-1">
+
+<div id="org2d7447e" class="figure">
+<p><img src="./imgs/bpp_ip.png" alt="bpp_ip.png" width="300pt" />
+</p>
+</div>
+</div>
+</div>
+</div>
+<div id="outline-container-org61df026" class="outline-2">
+<h2 id="org61df026"><span class="section-number-2">3.</span> Installation</h2>
+<div class="outline-text-2" id="text-3">
+<p>
+Cloning the repository:
+</p>
+<pre class="example">
+git clone git@github.com:isotlaboratory/ml4vrp.git
+</pre>
+<p>
+Then our fork of <a href="https://github.com/ds4dm/ecole">École</a>:
+</p>
+<pre class="example">
+git clone git@github.com:ndrwnaguib/ecole.git
+</pre>
+<p>
+And eventually, SCIP, which is the underlying mathematical solver where we
+replace the branching strategies with trained classifiers, <a href="https://scipopt.org/index.php#download">from here</a>. Once the
+precomplied version have been extracted, install école using:
+</p>
+<pre class="example">
+cd [PATH]/[TO]/ecole
+CMAKE_ARGS="-DSCIP_DIR=[PATH]/[TO]/scipoptsuite/src/build/scip -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON" python -m pip install .
+</pre>
+
+<p>
+Moreover, the following packages are necessary for the sampling, training, and evaluation steps:
+</p>
+
+<pre class="example">
+export SCIPOPTDIR=[PATH]/[TO]/scipoptsuite/usr
+python -m pip install pyscipopt
+#
+python -m pip install pytorch-lightning
+python -m pip install fairscale
+python -m pip install randomname
+</pre>
+</div>
+
+<div id="outline-container-orge844bac" class="outline-3">
+<h3 id="orge844bac"><span class="section-number-3">3.1.</span> Optimization Problems Instances</h3>
+<div class="outline-text-3" id="text-3-1">
+<p>
+The instances used in our experiments for BPP are already included in the
+repository given their light size. However, to download the VRP instances,
+please run the <a href="./instances/vrp/download.sh">./instances/vrp/download.sh</a> bash script.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-org7fcce50" class="outline-2">
+<h2 id="org7fcce50"><span class="section-number-2">4.</span> Usage Instructions</h2>
+<div class="outline-text-2" id="text-4">
+</div>
+<div id="outline-container-orgb4c768f" class="outline-3">
+<h3 id="orgb4c768f"><span class="section-number-3">4.1.</span> Sampling</h3>
+<div class="outline-text-3" id="text-4-1">
+<p>
+To sample B&amp;B decisions when solving a VRP instance, please use the
+following command:
+</p>
+<pre class="example">
+python sample.py --problem "VRP" --instance [VRP_FILE_FORMAT_FILE_PATH] --num-train-samples [DECISION SAMPLES SIZE]
+</pre>
+
+<p>
+For example, to sample a dataset of 1000 decision samples for the <a href="http://vrp.galgos.inf.puc-rio.br/index.php/en/plotted-instances?data=A-n32-k5">A-n32-k5</a>
+instance, the command is:
+</p>
+<pre class="example">
+python sample.py --problem "VRP" --instance datasets/vrp/A/A-n32-k5.vrp --num-train-samples 1000
+</pre>
+
+<p>
+The same command can be used with to do the sample B&amp;B decisions for the BPP; however, along with changing
+the input instance accordingly.
+</p>
+</div>
+
+<div id="outline-container-orgf5c503e" class="outline-4">
+<h4 id="orgf5c503e"><span class="section-number-4">4.1.1.</span> Research sampled datasets</h4>
+<div class="outline-text-4" id="text-4-1-1">
+<p>
+The datasets we sampled and used to train our models are larger in size, we are
+going to share them as soon as we find a suitable dataset repository.
+</p>
+</div>
+</div>
+</div>
+
+<div id="outline-container-orge529e5d" class="outline-3">
+<h3 id="orge529e5d"><span class="section-number-3">4.2.</span> Training</h3>
+<div class="outline-text-3" id="text-4-2">
+<pre class="example">
+python train.py --samples-path samples/A-n32-k5 --gpus 1 --cpus 6 --name [EXP_NAME] --model-name GCNN --log-dir logs --epochs 1
+</pre>
+</div>
+</div>
+<div id="outline-container-orgc0c2b43" class="outline-3">
+<h3 id="orgc0c2b43"><span class="section-number-3">4.3.</span> Evaluation</h3>
+<div class="outline-text-3" id="text-4-3">
+<p>
+The trained models can be evaluated using:
+</p>
+<pre class="example">
+python evaluate.py --checkpoint weights/vrp/GraphSAGE/A-32-k5_GraphSAGE --arch GraphSAGE --results-path . --time-limit 60 --dataset datasets/vrp/A/M-n151-k12.vrp --problem CVRP
+</pre>
+
+<p>
+Additionally, there is a <code class="src src-sh">--live</code> for both problems which plots the
+process of solving both the relaxed problem and printing the feasible solutions.
+</p>
+
+
+<p>
+A small <i>warning</i> when using that option for BPP; the plotting uses
+multi-threading, and spawns a number of threads equal to the number of
+available bins, while this may be improved, at the time, we were only
+evaluating simple problems where number of bins ranged from 30-60.
+</p>
+
+<p>
+Also, one might notice that the transparent blue boxes sometimes, if not
+always, break free from the bin borders (in BPP), these are not coding
+glitches, in fact, they properly represent the relaxed problem, during which
+the constraints to the original problem (the boxes in other colors) are
+relaxed, i.e., allowed to be violated. The same concept applies to the
+background blue lines in the VRP visualization.
+</p>
+
+<pre class="example">
+python evaluate.py --checkpoint weights/vrp/GraphSAGE/A-32-k5_GraphSAGE --arch GraphSAGE --results-path . --time-limit 60 --dataset datasets/vrp/A/M-n151-k12.vrp --problem CVRP --live
+</pre>
+</div>
+
+<div id="outline-container-org33d5729" class="outline-4">
+<h4 id="org33d5729"><span class="section-number-4">4.3.1.</span> Pre-trained Models</h4>
+<div class="outline-text-4" id="text-4-3-1">
+<p>
+The trained models weights are available under <a href="./weights">./weights</a>.
+For example, one can load the architecture
+weights when trained on as follows:
+</p>
+<pre class="example">
+python evaluate.py --checkpoint weights/[PROBLEM]/A-n32-k5_GraphSAGE
+</pre>
+
+<p>
+where PROBLEM <img src="ltximg/readme_d7090c1eff0b7e1146dc439909daad17541335b7.svg" alt="${\tiny \in}$" class="org-svg" /> {CVRP, BPP}.
+</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div id="postamble" class="status">
+<p class="author">Author: Andrew A. N.</p>
+<p class="date">Created: 2023-07-27 Thu 10:48</p>
+<p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
+</div>
+</body>
+</html>

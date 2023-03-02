@@ -1,0 +1,148 @@
+#+HTML_HEAD:  <style> td img {width: 80%;} </style>
+#+HTML_MATHJAX: align: left indent: 5em tagside: left
+#+options: tex:dvisvgm
+#+LATEX_CLASS: article
+#+LATEX_CLASS_OPTIONS: [american]
+#+latex_header: \usepackage{optidef}
+#+latex_header: \usepackage{amsfonts,amsmath,amsthm,amssymb,bm}
+#+title:  On Statistical Learning of Branch and Bound for Vehicle Routing Optimization @@html: <IMG SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"/> <br>@@ 
+#+description: This repository contains the code for reproducing the experiments conducted in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
+
+
+* Vehicle Routing Problem
+The violet lines represent integer but not feasible solutions, once a feasible
+solution has been found, the paths are distinguished by colors. The light blue
+lines fumbling around represent the LP-relaxed problem.
+#+BEGIN_CENTER
+#+END_CENTER
+
+#+BEGIN_CENTER
+#+CAPTION: Solving topologically different VRP instances using modified versions of [[https://arxiv.org/abs/1906.01629][GCNN]], [[https://arxiv.org/abs/1706.02216][GraphSAGE]], and [[https://arxiv.org/abs/1710.10903][GAT]].
+|            <c>            |              <c>               |           <c>            |
+|           GCNN            |           GraphSAGE            |           GAT            |
+|---------------------------+--------------------------------+--------------------------|
+| [[./gifs/P-n55-k10_GCNN.gif]] | [[./gifs/P-n55-k10_GraphSAGE.gif]] | [[./gifs/P-n55-k10_GAT.gif]] |
+|  [[./gifs/B-n66-k9_GAT.gif]]  | [[./gifs/B-n66-k9_GraphSAGE.gif]]  | [[./gifs/B-n66-k9_GAT.gif]]  |
+| [[./gifs/E-n76-k8_GCNN.gif]]  | [[./gifs/E-n76-k8_GraphSAGE.gif]]  | [[./gifs/E-n76-k8_GAT.gif]]  |
+|   [[./gifs/P-n55-k15.gif]]    | [[./gifs/P-n55-k15_GraphSAGE.gif]] | [[./gifs/P-n55-k15_GAT.gif]] |
+|      [[./imgs/gcnn.png]]      |     [[./imgs/graph_sage.png]]      | [[./imgs/gat.png]]           |
+#+END_CENTER
+
+** Integer Program
+
+#+ATTR_HTML: :width 300pt
+[[./imgs/cvrp_ip.png]]
+
+
+* Bin Packing Problem
+Although BPP classifiers can be used/trained independently, the original motive
+for this research was to provide a means to calculating the minimum number of
+required vehicles for solving a VRP instance. The blue boxes, filling the right
+side of the bin, analogously, represent the LP-relaxed problem (which are
+cruising out of the bins since they have less constraints :).
+#+begin_center
+#+ATTR_HTML: :width 90%
+#+CAPTION: Distributing 80 weighted items across 48 bins using GraphSAGE
+[[./gifs/u80_00_GCNN.gif]]
+#+end_center
+
+** Integer Program
+
+#+ATTR_HTML: :width 300pt
+[[./imgs/bpp_ip.png]]
+* Installation
+Cloning the repository:
+#+begin_src
+  git clone git@github.com:isotlaboratory/ml4vrp.git
+#+end_src
+Then our fork of [[https://github.com/ds4dm/ecole][École]]:
+#+begin_src
+  git clone git@github.com:ndrwnaguib/ecole.git
+#+end_src
+And eventually, SCIP, which is the underlying mathematical solver where we
+replace the branching strategies with trained classifiers, [[https://scipopt.org/index.php#download][from here]]. Once the
+precomplied version have been extracted, install école using:
+#+begin_src
+  cd [PATH]/[TO]/ecole
+  CMAKE_ARGS="-DSCIP_DIR=[PATH]/[TO]/scipoptsuite/src/build/scip -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON" python -m pip install .
+#+end_src
+
+Moreover, the following packages are necessary for the sampling, training, and evaluation steps:
+
+#+begin_src
+export SCIPOPTDIR=[PATH]/[TO]/scipoptsuite/usr
+python -m pip install pyscipopt
+#
+python -m pip install pytorch-lightning
+python -m pip install fairscale
+python -m pip install randomname
+#+end_src
+
+** Optimization Problems Instances
+
+The instances used in our experiments for BPP are already included in the
+repository given their light size. However, to download the VRP instances,
+please run the [[./instances/vrp/download.sh]] bash script.
+
+* Usage Instructions
+** Sampling
+  To sample B&B decisions when solving a VRP instance, please use the
+  following command:
+  #+begin_src
+    python sample.py --problem "VRP" --instance [VRP_FILE_FORMAT_FILE_PATH] --num-train-samples [DECISION SAMPLES SIZE]
+  #+end_src
+
+  For example, to sample a dataset of 1000 decision samples for the [[http://vrp.galgos.inf.puc-rio.br/index.php/en/plotted-instances?data=A-n32-k5][A-n32-k5]]
+  instance, the command is:
+  #+begin_src
+    python sample.py --problem "VRP" --instance datasets/vrp/A/A-n32-k5.vrp --num-train-samples 1000
+  #+end_src
+
+  The same command can be used with src_sh[:exports_code]{--problem
+  BPP} to do the sample B&B decisions for the BPP; however, along with changing
+  the input instance accordingly.
+
+*** Research sampled datasets
+
+  The datasets we sampled and used to train our models are larger in size, we are
+  going to share them as soon as we find a suitable dataset repository.
+
+** Training
+  #+begin_src
+    python train.py --samples-path samples/A-n32-k5 --gpus 1 --cpus 6 --name [EXP_NAME] --model-name GCNN --log-dir logs --epochs 1
+  #+end_src
+** Evaluation
+  The trained models can be evaluated using:
+  #+begin_src
+    python evaluate.py --checkpoint weights/vrp/GraphSAGE/A-32-k5_GraphSAGE --arch GraphSAGE --results-path . --time-limit 60 --dataset datasets/vrp/A/M-n151-k12.vrp --problem CVRP
+  #+end_src
+
+  Additionally, there is a src_sh[:exports code]{--live} for both problems which plots the
+  process of solving both the relaxed problem and printing the feasible solutions.
+
+
+  A small /warning/ when using that option for BPP; the plotting uses
+  multi-threading, and spawns a number of threads equal to the number of
+  available bins, while this may be improved, at the time, we were only
+  evaluating simple problems where number of bins ranged from 30-60.
+
+  Also, one might notice that the transparent blue boxes sometimes, if not
+  always, break free from the bin borders (in BPP), these are not coding
+  glitches, in fact, they properly represent the relaxed problem, during which
+  the constraints to the original problem (the boxes in other colors) are
+  relaxed, i.e., allowed to be violated. The same concept applies to the
+  background blue lines in the VRP visualization.
+
+  #+begin_src
+    python evaluate.py --checkpoint weights/vrp/GraphSAGE/A-32-k5_GraphSAGE --arch GraphSAGE --results-path . --time-limit 60 --dataset datasets/vrp/A/M-n151-k12.vrp --problem CVRP --live
+  #+end_src
+
+*** Pre-trained Models
+  The trained models weights are available under [[./weights]].
+  For example, one can load the src_sh[:exports_code]{GraphSAGE} architecture
+  weights when trained on src_sh[:exports_code]{A-n32-k5} as follows:
+  #+begin_src
+    python evaluate.py --checkpoint weights/[PROBLEM]/A-n32-k5_GraphSAGE
+  #+end_src
+
+  where PROBLEM ${\tiny \in}$ {CVRP, BPP}.
