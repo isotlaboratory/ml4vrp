@@ -9,7 +9,7 @@
 #+description: This repository contains the code for reproducing the experiments performed in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
 
 
-[[https://github.com/isotlaboratory/ml4vrp][This repository]] contains the code for reproducing the experiments performed in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
+[[https://github.com/isotlaboratory/ml4vrp][This repository]] contains the code for reproducing the experiments performed in the [[https://arxiv.org/abs/2310.09986]["On Statistical Learning of Branch and Bound for Vehicle Routing Optimization"]] research paper.
 
 * Vehicle Routing Problem
 The violet lines represent integer but not feasible solutions, once a feasible

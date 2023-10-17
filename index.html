@@ -3,11 +3,11 @@
 "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">
 <head>
-<!-- 2023-03-02 Thu 03:27 -->
+<!-- 2023-10-16 Mon 18:03 -->
 <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>On Statistical Learning of Branch and Bound for Vehicle Routing Optimization @@html: &lt;IMG SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"/&gt; &lt;br&gt;@@</title>
-<meta name="author" content="Andrew A. N." />
+<title>On Statistical Learning of Branch and Bound for Vehicle Routing Optimization</title>
+<meta name="author" content="Andrew Naguib" />
 <meta name="description" content="This repository contains the code for reproducing the experiments performed in the &quot;On Statistical Learning of Branch and Bound for Vehicle Routing Optimization&quot; research paper." />
 <meta name="generator" content="Org Mode" />
 <style>
@@ -198,37 +198,37 @@
 </head>
 <body>
 <div id="content" class="content">
-<h1 class="title">On Statistical Learning of Branch and Bound for Vehicle Routing Optimization  <IMG SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"/> <br></h1>
+<h1 class="title">On Statistical Learning of Branch and Bound for Vehicle Routing Optimization  <img SRC="imgs/vrp.png" ALIGN="right" HSPACE="50" VSPACE="50" width="150pt"></h1>
 <div id="table-of-contents" role="doc-toc">
 <h2>Table of Contents</h2>
 <div id="text-table-of-contents" role="doc-toc">
 <ul>
-<li><a href="#org2cab871">1. Vehicle Routing Problem</a>
+<li><a href="#orged6fca3">1. Vehicle Routing Problem</a>
 <ul>
-<li><a href="#orgcd3256a">1.1. Integer Program</a></li>
+<li><a href="#orgc0a1ac6">1.1. Integer Program</a></li>
 </ul>
 </li>
-<li><a href="#org52598b3">2. Bin Packing Problem</a>
+<li><a href="#org22e277e">2. Bin Packing Problem</a>
 <ul>
-<li><a href="#org94c88ae">2.1. Integer Program</a></li>
+<li><a href="#orgbccd27c">2.1. Integer Program</a></li>
 </ul>
 </li>
-<li><a href="#orgec46962">3. Installation</a>
+<li><a href="#org143049b">3. Installation</a>
 <ul>
-<li><a href="#org2d08d77">3.1. Optimization Problems Instances</a></li>
+<li><a href="#org49de77a">3.1. Optimization Problems Instances</a></li>
 </ul>
 </li>
-<li><a href="#orge0aba4d">4. Usage Instructions</a>
+<li><a href="#orgd5a05e2">4. Usage Instructions</a>
 <ul>
-<li><a href="#orgef7c5ae">4.1. Sampling</a>
+<li><a href="#org7d728b6">4.1. Sampling</a>
 <ul>
-<li><a href="#orgc9fd469">4.1.1. Research sampled datasets</a></li>
+<li><a href="#org207655d">4.1.1. Research sampled datasets</a></li>
 </ul>
 </li>
-<li><a href="#org70e54f1">4.2. Training</a></li>
-<li><a href="#orgcac7c24">4.3. Evaluation</a>
+<li><a href="#orgf99123b">4.2. Training</a></li>
+<li><a href="#org9a4fc69">4.3. Evaluation</a>
 <ul>
-<li><a href="#org862a550">4.3.1. Pre-trained Models</a></li>
+<li><a href="#orgd5968fb">4.3.1. Pre-trained Models</a></li>
 </ul>
 </li>
 </ul>
@@ -236,13 +236,12 @@
 </ul>
 </div>
 </div>
-
 <p>
-<a href="https://github.com/isotlaboratory/ml4vrp">This repository</a> contains the code for reproducing the experiments performed in the "On Statistical Learning of Branch and Bound for Vehicle Routing Optimization" research paper.
+<a href="https://github.com/isotlaboratory/ml4vrp">This repository</a> contains the code for reproducing the experiments performed in the <a href="https://arxiv.org/abs/2310.09986">"On Statistical Learning of Branch and Bound for Vehicle Routing Optimization"</a> research paper.
 </p>
 
-<div id="outline-container-org2cab871" class="outline-2">
-<h2 id="org2cab871"><span class="section-number-2">1.</span> Vehicle Routing Problem</h2>
+<div id="outline-container-orged6fca3" class="outline-2">
+<h2 id="orged6fca3"><span class="section-number-2">1.</span> Vehicle Routing Problem</h2>
 <div class="outline-text-2" id="text-1">
 <p>
 The violet lines represent integer but not feasible solutions, once a feasible
@@ -305,11 +304,11 @@ nil</div>
 </div>
 </div>
 
-<div id="outline-container-orgcd3256a" class="outline-3">
-<h3 id="orgcd3256a"><span class="section-number-3">1.1.</span> Integer Program</h3>
+<div id="outline-container-orgc0a1ac6" class="outline-3">
+<h3 id="orgc0a1ac6"><span class="section-number-3">1.1.</span> Integer Program</h3>
 <div class="outline-text-3" id="text-1-1">
 
-<div id="orgfdb1498" class="figure">
+<div id="org8c0a4d7" class="figure">
 <p><img src="./imgs/cvrp_ip.png" alt="cvrp_ip.png" width="300pt" />
 </p>
 </div>
@@ -318,8 +317,8 @@ nil</div>
 </div>
 
 
-<div id="outline-container-org52598b3" class="outline-2">
-<h2 id="org52598b3"><span class="section-number-2">2.</span> Bin Packing Problem</h2>
+<div id="outline-container-org22e277e" class="outline-2">
+<h2 id="org22e277e"><span class="section-number-2">2.</span> Bin Packing Problem</h2>
 <div class="outline-text-2" id="text-2">
 <p>
 Although BPP classifiers can be used/trained independently, the original motive
@@ -330,7 +329,7 @@ cruising out of the bins since they have less constraints :).
 </p>
 <div class="org-center">
 
-<div id="org71f6599" class="figure">
+<div id="org7c06387" class="figure">
 <p><img src="./gifs/u80_00_GCNN.gif" alt="u80_00_GCNN.gif" width="90%" />
 </p>
 <p><span class="figure-number">Figure 1: </span>Distributing 80 weighted items across 48 bins using GraphSAGE</p>
@@ -338,19 +337,19 @@ cruising out of the bins since they have less constraints :).
 </div>
 </div>
 
-<div id="outline-container-org94c88ae" class="outline-3">
-<h3 id="org94c88ae"><span class="section-number-3">2.1.</span> Integer Program</h3>
+<div id="outline-container-orgbccd27c" class="outline-3">
+<h3 id="orgbccd27c"><span class="section-number-3">2.1.</span> Integer Program</h3>
 <div class="outline-text-3" id="text-2-1">
 
-<div id="org3ba936b" class="figure">
+<div id="org4a9965b" class="figure">
 <p><img src="./imgs/bpp_ip.png" alt="bpp_ip.png" width="300pt" />
 </p>
 </div>
 </div>
 </div>
 </div>
-<div id="outline-container-orgec46962" class="outline-2">
-<h2 id="orgec46962"><span class="section-number-2">3.</span> Installation</h2>
+<div id="outline-container-org143049b" class="outline-2">
+<h2 id="org143049b"><span class="section-number-2">3.</span> Installation</h2>
 <div class="outline-text-2" id="text-3">
 <p>
 Cloning the repository:
@@ -398,8 +397,8 @@ python -m pip install randomname
 </pre>
 </div>
 
-<div id="outline-container-org2d08d77" class="outline-3">
-<h3 id="org2d08d77"><span class="section-number-3">3.1.</span> Optimization Problems Instances</h3>
+<div id="outline-container-org49de77a" class="outline-3">
+<h3 id="org49de77a"><span class="section-number-3">3.1.</span> Optimization Problems Instances</h3>
 <div class="outline-text-3" id="text-3-1">
 <p>
 The instances used in our experiments for BPP are already included in the
@@ -410,12 +409,12 @@ please run the <a href="./instances/vrp/download.sh">./instances/vrp/download.sh
 </div>
 </div>
 
-<div id="outline-container-orge0aba4d" class="outline-2">
-<h2 id="orge0aba4d"><span class="section-number-2">4.</span> Usage Instructions</h2>
+<div id="outline-container-orgd5a05e2" class="outline-2">
+<h2 id="orgd5a05e2"><span class="section-number-2">4.</span> Usage Instructions</h2>
 <div class="outline-text-2" id="text-4">
 </div>
-<div id="outline-container-orgef7c5ae" class="outline-3">
-<h3 id="orgef7c5ae"><span class="section-number-3">4.1.</span> Sampling</h3>
+<div id="outline-container-org7d728b6" class="outline-3">
+<h3 id="org7d728b6"><span class="section-number-3">4.1.</span> Sampling</h3>
 <div class="outline-text-3" id="text-4-1">
 <p>
 To sample B&amp;B decisions when solving a VRP instance, please use the
@@ -439,8 +438,8 @@ the input instance accordingly.
 </p>
 </div>
 
-<div id="outline-container-orgc9fd469" class="outline-4">
-<h4 id="orgc9fd469"><span class="section-number-4">4.1.1.</span> Research sampled datasets</h4>
+<div id="outline-container-org207655d" class="outline-4">
+<h4 id="org207655d"><span class="section-number-4">4.1.1.</span> Research sampled datasets</h4>
 <div class="outline-text-4" id="text-4-1-1">
 <p>
 The datasets we sampled and used to train our models are larger in size, we are
@@ -450,16 +449,16 @@ going to share them as soon as we find a suitable dataset repository.
 </div>
 </div>
 
-<div id="outline-container-org70e54f1" class="outline-3">
-<h3 id="org70e54f1"><span class="section-number-3">4.2.</span> Training</h3>
+<div id="outline-container-orgf99123b" class="outline-3">
+<h3 id="orgf99123b"><span class="section-number-3">4.2.</span> Training</h3>
 <div class="outline-text-3" id="text-4-2">
 <pre class="example">
 python train.py --samples-path samples/A-n32-k5 --gpus 1 --cpus 6 --name [EXP_NAME] --model-name GCNN --log-dir logs --epochs 1
 </pre>
 </div>
 </div>
-<div id="outline-container-orgcac7c24" class="outline-3">
-<h3 id="orgcac7c24"><span class="section-number-3">4.3.</span> Evaluation</h3>
+<div id="outline-container-org9a4fc69" class="outline-3">
+<h3 id="org9a4fc69"><span class="section-number-3">4.3.</span> Evaluation</h3>
 <div class="outline-text-3" id="text-4-3">
 <p>
 The trained models can be evaluated using:
@@ -495,12 +494,12 @@ python evaluate.py --checkpoint weights/vrp/GraphSAGE/A-32-k5_GraphSAGE --arch G
 </pre>
 </div>
 
-<div id="outline-container-org862a550" class="outline-4">
-<h4 id="org862a550"><span class="section-number-4">4.3.1.</span> Pre-trained Models</h4>
+<div id="outline-container-orgd5968fb" class="outline-4">
+<h4 id="orgd5968fb"><span class="section-number-4">4.3.1.</span> Pre-trained Models</h4>
 <div class="outline-text-4" id="text-4-3-1">
 <p>
 The trained models weights are available under <a href="./weights">./weights</a>.
-For exmple, one can load the architecture
+For example, one can load the architecture
 weights when trained on as follows:
 </p>
 <pre class="example">
@@ -517,7 +516,7 @@ where PROBLEM <img src="ltximg/readme_d7090c1eff0b7e1146dc439909daad17541335b7.s
 </div>
 <div id="postamble" class="status">
 <p class="author">Author: Andrew Naguib</p>
-<p class="date">Created: 2023-03-02 Thu 03:27</p>
+<p class="date">Created: 2023-10-16 Mon 18:03</p>
 <p class="validation"><a href="https://validator.w3.org/check?uri=referer">Validate</a></p>
 </div>
 </body>
