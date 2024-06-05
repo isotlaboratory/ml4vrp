@@ -70,7 +70,7 @@ or, equivalently, cloning the original source code of École and patching it usi
 
 And eventually, SCIP, which is the underlying mathematical solver where we
 replace the branching strategies with trained classifiers, [[https://scipopt.org/index.php#download][from here]]. Once the
-precomplied version have been extracted, install école using:
+precompiled version have been extracted, install école using:
 #+begin_src
   cd [PATH]/[TO]/ecole
   CMAKE_ARGS="-DSCIP_DIR=[PATH]/[TO]/scipoptsuite/src/build/scip -DCMAKE_INSTALL_RPATH_USE_LINK_PATH=ON" python -m pip install .
